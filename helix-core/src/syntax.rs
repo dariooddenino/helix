@@ -984,11 +984,14 @@ impl LanguageLayer {
     }
 
     fn parse(&mut self, parser: &mut Parser, source: &Rope) -> Result<(), Error> {
+        use std::time::Instant;
         parser.set_included_ranges(&self.ranges).unwrap();
 
         parser
             .set_language(self.config.language)
             .map_err(|_| Error::InvalidLanguage)?;
+
+        let now = Instant::now();
 
         // unsafe { syntax.parser.set_cancellation_flag(cancellation_flag) };
         let tree = parser
@@ -1005,6 +1008,9 @@ impl LanguageLayer {
                 self.tree.as_ref(),
             )
             .ok_or(Error::Cancelled)?;
+
+        log::trace!("Tree sitter parse {:?}", Instant::now().duration_since(now));
+
         // unsafe { ts_parser.parser.set_cancellation_flag(None) };
         self.tree = Some(tree);
         Ok(())
@@ -1251,7 +1257,9 @@ impl HighlightConfiguration {
         injection_query: &str,
         locals_query: &str,
     ) -> Result<Self, QueryError> {
+        use std::time::Instant;
         // Concatenate the query strings, keeping track of the start offset of each section.
+        let now = Instant::now();
         let mut query_source = String::new();
         query_source.push_str(locals_query);
         let highlights_query_offset = query_source.len();
@@ -1260,6 +1268,7 @@ impl HighlightConfiguration {
         // Construct a single query by concatenating the three query strings, but record the
         // range of pattern indices that belong to each individual string.
         let query = Query::new(language, &query_source)?;
+        log::trace!("Tree sitter query {:?}", Instant::now().duration_since(now));
         let mut highlights_pattern_index = 0;
         for i in 0..(query.pattern_count()) {
             let pattern_offset = query.start_byte_for_pattern(i);
